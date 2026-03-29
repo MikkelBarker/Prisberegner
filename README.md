@@ -1,0 +1,2 @@
+# Prisberegner
+Prisberegner script
