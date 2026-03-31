@@ -49,6 +49,16 @@
   /* Typography */
   --font-display: 'TT Ramillas', 'Georgia', serif;
   --font-body:    'IBM Plex Sans', sans-serif;
+
+  /* Font sizes – controlled from Google Sheet */
+  --fs-body:      14px;   /* Brødtekst / inputfelter */
+  --fs-small:     12px;   /* Hjælpetekst og labels */
+  --fs-label:     13px;   /* Feltlabels */
+  --fs-btn:       15px;   /* Knaptext */
+  --fs-card-h:    1.15rem;/* Korttitler */
+  --fs-price:     clamp(2rem,6vw,3.5rem); /* Stor prisvisning */
+  --fs-range:     clamp(1.8rem,5vw,2.8rem); /* Prisinterval teaser */
+  --fs-sec-lbl:   11px;   /* Sektionslabels */
 }
 
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
@@ -59,12 +69,13 @@ body {
   color: var(--ink);
   line-height: 1.65;
   font-weight: 300;
+  font-size: var(--fs-body);
 }
 .wrap { max-width: 840px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem }
 
 /* ── Section label ── */
 .sec-lbl {
-  font-size: 11px;
+  font-size: var(--fs-sec-lbl);
   letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--ink3);
@@ -86,21 +97,21 @@ body {
 }
 .card h3 {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--fs-card-h);
   font-weight: 400;
   margin-bottom: .2rem;
   letter-spacing: -.01em;
 }
-.card .sub { font-size: 13px; color: var(--ink3); margin-bottom: 1.25rem; font-weight: 300 }
+.card .sub { font-size: var(--fs-label); color: var(--ink3); margin-bottom: 1.25rem; font-weight: 300 }
 
 /* ── Form elements ── */
-label.fl { display:block; font-size:13px; color:var(--ink2); margin-bottom:5px; font-weight:500 }
+label.fl { display:block; font-size:var(--fs-label); color:var(--ink2); margin-bottom:5px; font-weight:500 }
 input[type=text],input[type=email],input[type=tel],input[type=number],select,textarea {
   width:100%; padding:10px 13px;
   border: var(--border-w) solid var(--border2);
   border-radius: var(--radius);
   font-family: var(--font-body);
-  font-size: 14px; color: var(--ink); background: var(--paper);
+  font-size: var(--fs-body); color: var(--ink); background: var(--paper);
   outline:none; transition:border-color .15s; appearance:none; -webkit-appearance:none;
   font-weight: 300;
 }
@@ -130,7 +141,7 @@ select {
 .km-pill.ok  { display:block; color:var(--accent); background:var(--accent-l) }
 .km-pill.spin{ display:block; color:var(--ink3); background:var(--surface) }
 .km-pill.err { display:block; color:#a33; background:#fdecea }
-.km-note { font-size:12px; color:var(--ink3); margin-top:5px; min-height:1.3em }
+.km-note { font-size:var(--fs-small); color:var(--ink3); margin-top:5px; min-height:1.3em }
 
 /* ── Toggle buttons ── */
 .tog-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-top:4px }
@@ -139,7 +150,7 @@ select {
   border: var(--border-w) solid var(--border2);
   border-radius: var(--radius);
   background: var(--paper);
-  font-family: var(--font-body); font-size:13px; color:var(--ink2);
+  font-family: var(--font-body); font-size:var(--fs-label); color:var(--ink2);
   cursor:pointer; transition:all .15s; text-align:center; user-select:none;
   font-weight: 400;
 }
@@ -158,7 +169,7 @@ select {
 }
 .island-box.show { display:flex }
 .warn-box { background:#fdecea; border-radius:var(--radius); padding:.75rem 1rem; font-size:13px; color:#a33; margin-bottom:.75rem }
-.hint { font-size:12px; color:var(--ink3); margin-top:4px; line-height:1.5 }
+.hint { font-size:var(--fs-small); color:var(--ink3); margin-top:4px; line-height:1.5 }
 
 /* ── Teaser (blurred price) ── */
 .teaser {
@@ -178,10 +189,10 @@ select {
 .t-lbl { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.5rem }
 .t-range {
   font-family: var(--font-display);
-  font-size: clamp(1.8rem,5vw,2.8rem);
+  font-size: var(--fs-range);
   font-weight: 400; color:#fff; line-height:1.1; margin-bottom:.3rem;
 }
-.t-sub { font-size:13px; color:rgba(255,255,255,.45); font-weight:300; margin-bottom:1.5rem }
+.t-sub { font-size:var(--fs-label); color:rgba(255,255,255,.45); font-weight:300; margin-bottom:1.5rem }
 .blur-row {
   display:flex; justify-content:space-between; align-items:center;
   background:rgba(255,255,255,.07); border-radius:var(--radius);
@@ -200,7 +211,7 @@ select {
   margin-bottom: 1.5rem;
 }
 .lead-card h3 { font-family:var(--font-display); font-size:1.2rem; font-weight:400; margin-bottom:.25rem }
-.lead-card .sub { font-size:13px; color:var(--ink3); margin-bottom:1.5rem; font-weight:300 }
+.lead-card .sub { font-size:var(--fs-label); color:var(--ink3); margin-bottom:1.5rem; font-weight:300 }
 
 /* Email verification states */
 .email-status { font-size:12px; margin-top:4px; min-height:1.2em }
@@ -221,12 +232,12 @@ select {
   background:rgba(255,255,255,.04);
 }
 .f-lbl { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.5rem }
-.f-price { font-family:var(--font-display); font-size:clamp(2rem,6vw,3.5rem); font-weight:400; color:#fff; line-height:1.1; margin-bottom:.2rem }
+.f-price { font-family:var(--font-display); font-size:var(--fs-price); font-weight:400; color:#fff; line-height:1.1; margin-bottom:.2rem }
 .f-sub { font-size:13px; color:rgba(255,255,255,.45); font-weight:300; margin-bottom:1.5rem }
 .bk { background:rgba(255,255,255,.07); border-radius:var(--radius); padding:1rem }
-.bk-sec { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.3); margin:12px 0 4px }
+.bk-sec { font-size:var(--fs-sec-lbl); letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.3); margin:12px 0 4px }
 .bk-sec:first-child { margin-top:0 }
-.bk-row { display:flex; justify-content:space-between; padding:5px 0; font-size:13px; color:rgba(255,255,255,.62) }
+.bk-row { display:flex; justify-content:space-between; padding:5px 0; font-size:var(--fs-label); color:rgba(255,255,255,.62) }
 .bk-row.total { border-top:.5px solid rgba(255,255,255,.15); margin-top:8px; padding-top:10px; color:#fff; font-weight:500 }
 .g { color:var(--accent) }
 
@@ -234,20 +245,20 @@ select {
 .info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:1.5rem }
 .tile { background:var(--surface); border-radius:var(--radius); padding:.85rem 1rem }
 .tile .v { font-size:1.2rem; font-weight:500; color:var(--ink); margin-bottom:2px }
-.tile .l { font-size:12px; color:var(--ink3) }
+.tile .l { font-size:var(--fs-small); color:var(--ink3) }
 
 /* ── Success ── */
 .success { text-align:center; padding:2rem 1rem }
 .sico { width:52px; height:52px; border-radius:50%; background:var(--accent-l); display:flex; align-items:center; justify-content:center; margin:0 auto 1.1rem; font-size:20px; color:var(--accent) }
 .success h3 { font-family:var(--font-display); font-size:1.4rem; font-weight:400; margin-bottom:.4rem }
-.success p { font-size:13px; color:var(--ink3) }
+.success p { font-size:var(--fs-label); color:var(--ink3) }
 
 /* ── Buttons ── */
 .btn {
   width:100%; padding:14px;
   background: var(--dark); color:#fff; border:none;
   border-radius: var(--radius-btn);
-  font-family:var(--font-body); font-size:15px; font-weight:500;
+  font-family:var(--font-body); font-size:var(--fs-btn); font-weight:500;
   cursor:pointer; transition:background .15s,transform .1s;
 }
 .btn:hover { opacity:.88 }
@@ -262,8 +273,8 @@ select {
 }
 .btn-pill:hover { background:var(--accent-l) }
 
-.small { font-size:12px; color:var(--ink3); text-align:center; margin-top:.9rem; line-height:1.65 }
-.err { font-size:12px; color:#c0392b; margin-top:4px }
+.small { font-size:var(--fs-small); color:var(--ink3); text-align:center; margin-top:.9rem; line-height:1.65 }
+.err { font-size:var(--fs-small); color:#c0392b; margin-top:4px }
 .hidden { display:none!important }
 
 /* ── OTP verification panel ── */
@@ -292,15 +303,6 @@ select {
 .otp-digit:focus { border-color:var(--accent); background:#fff }
 .otp-resend { font-size:12px; color:var(--ink3); margin-top:.5rem; cursor:pointer; text-decoration:underline }
 .otp-err { font-size:13px; color:#c0392b; margin-top:.5rem; min-height:1.2em }
-
-/* ── Debug panel ── */
-#debug-panel { position:fixed; bottom:16px; right:16px; z-index:9999; background:#1F1F1F; color:#fff; border-radius:12px; padding:1rem 1.25rem; font-size:12px; font-family:monospace; max-width:340px; max-height:80vh; overflow-y:auto; box-shadow:0 4px 24px rgba(0,0,0,.3); }
-#debug-panel h5 { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#FF6600; margin-bottom:.5rem }
-#debug-panel .db-row { display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:.5px solid rgba(255,255,255,.08) }
-#debug-panel .db-k { color:rgba(255,255,255,.5) }
-#debug-panel .db-v { color:#7ecf97; font-weight:600 }
-#debug-panel .db-err { color:#f87171 }
-#debug-toggle { position:fixed; bottom:16px; right:16px; z-index:9998; background:#FF6600; color:#fff; border:none; border-radius:999px; padding:8px 14px; font-size:12px; cursor:pointer; font-family:monospace; }
 
 /* Loading spinner */
 .spinner {
@@ -558,10 +560,6 @@ select {
 </div>
 
 </div><!-- /wrap -->
-<button id="debug-toggle" onclick="toggleDebug()">🔍 Sheet debug</button>
-<div id="debug-panel" style="display:none">
-  <h5>Google Sheet debug</h5>
-  <div id="debug-content">Klikker...</div>
   <br>
   <button onclick="runDebug()" style="background:#FF6600;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;width:100%">Hent Sheet data</button>
 </div>
@@ -639,7 +637,8 @@ function parseCSV(text) {
 function applyDesign(map) {
   var root = document.documentElement;
   var tokens = ['accent','dark','paper','surface','radius','radius-lg','radius-btn','border-w',
-                'ink','ink2','ink3','white'];
+                'ink','ink2','ink3','white',
+                'fs-body','fs-small','fs-label','fs-btn','fs-card-h','fs-price','fs-range','fs-sec-lbl'];
   for (var i = 0; i < tokens.length; i++) {
     var t = tokens[i];
     if (map[t]) root.style.setProperty('--' + t, map[t]);
@@ -1222,30 +1221,6 @@ function reset() {
   try { window.scrollTo({top:0,behavior:'smooth'}); } catch(e){}
 }
 
-// ── Debug ───────────────────────────────────────────────────────────────────
-function toggleDebug() {
-  var p=document.getElementById('debug-panel'), b=document.getElementById('debug-toggle');
-  if(p.style.display==='none'){p.style.display='block';b.style.display='none';runDebug();}
-  else{p.style.display='none';b.style.display='block';}
-}
-function runDebug() {
-  var dc=document.getElementById('debug-content');
-  var root=document.documentElement;
-  var cur='<div style="color:rgba(255,255,255,.4);font-size:10px;margin-bottom:4px">AKTUELLE CSS TOKENS</div>';
-  ['accent','dark','paper','surface','radius','radius-lg','radius-btn','border-w'].forEach(function(t){
-    var v=getComputedStyle(root).getPropertyValue('--'+t).trim();
-    cur+='<div class="db-row"><span class="db-k">--'+t+'</span><span class="db-v">'+v+'</span></div>';
-  });
-  dc.innerHTML=cur+'<div style="color:rgba(255,255,255,.4);font-size:10px;margin:6px 0 2px">DESIGN SHEET</div><div id="ds-status">henter...</div>';
-  fetch(SHEET_DESIGN_URL).then(function(r){return r.text();}).then(function(txt){
-    var map=parseCSV(txt), keys=Object.keys(map), out='';
-    if(keys.length===0){out='<div class="db-err">⚠️ Ingen nøgler – publicer som CSV ikke Web page</div>';}
-    else{keys.forEach(function(k){out+='<div class="db-row"><span class="db-k">'+k+'</span><span class="db-v">'+map[k]+'</span></div>';});}
-    out+='<div style="color:rgba(255,255,255,.4);font-size:10px;margin:4px 0 2px">URL:</div><div style="color:#ccc;font-size:9px;word-break:break-all">'+SHEET_DESIGN_URL+'</div>';
-    document.getElementById('ds-status').innerHTML=out;
-    applyDesign(map);
-  }).catch(function(e){document.getElementById('ds-status').innerHTML='<div class="db-err">FEJL: '+e.message+'</div>';});
-}
 
 // Init EmailJS
 emailjs.init({ publicKey: EJS_KEY });
