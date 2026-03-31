@@ -334,7 +334,7 @@ select {
       <p class="km-note" id="km-note">Skriv adresse eller by – afstanden beregnes automatisk.</p>
       <div id="island-note" class="island-box hidden" style="margin-top:.6rem">
         <span style="font-size:16px;flex-shrink:0">⛴</span>
-        <span id="island-name-text">Denne destination</span><span> kræver færge, fly og muligvis overnatning, som aftales efter dialog.</span>
+        <span id="island-name-text">Denne destination</span><span> kræver ekstra kilometer, færge eller fly og muligvis overnatning, som aftales efter dialog.</span>
       </div>
       <div id="bornholm-note" class="island-box hidden" style="margin-top:.6rem">
         <span style="font-size:16px;flex-shrink:0">⛴</span>
@@ -342,7 +342,7 @@ select {
       </div>
       <div id="abroad-note" class="island-box hidden" style="margin-top:.6rem">
         <span style="font-size:16px;flex-shrink:0">✈️</span>
-        <span id="abroad-name-text">Denne destination</span><span> kræver transport og muligvis overnatning, som aftales efter dialog.</span>
+        <span id="abroad-name-text">Denne destination</span><span> kræver ekstra kilometer, færge eller fly og muligvis overnatning, som aftales efter dialog.</span>
       </div>
       
       <p id="err-address" class="err hidden">Indtast venligst en adresse eller by</p>
@@ -466,6 +466,9 @@ select {
     </div>
   </div>
 
+  <p style="font-size:13px;color:var(--ink2);background:var(--surface);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:.75rem;line-height:1.6">
+    📧 <strong>Sådan fungerer det:</strong> Når du trykker beregn, udfylder du navn og e-mail – vi sender en bekræftelseskode til din indbakke. Koden giver dig adgang til det detaljerede prisestimat direkte på siden.
+  </p>
   <button class="btn" onclick="runCalc()">Beregn prisestimat</button>
   <p class="small">Estimatet er vejledende og ikke bindende for nogen part.</p>
 </div>
@@ -560,9 +563,6 @@ select {
 </div>
 
 </div><!-- /wrap -->
-  <br>
-  <button onclick="runDebug()" style="background:#FF6600;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;width:100%">Hent Sheet data</button>
-</div>
 
 <!-- EmailJS -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -702,7 +702,7 @@ var EJS_SERVICE  = 'service_ym01yr9';
 var EJS_TEMPLATE = 'template_wqmeusj';
 // Template for sending OTP to user – you must create this template in EmailJS
 // with variables: {{to_email}}, {{to_name}}, {{otp_code}}, {{estimate_html}}
-var EJS_OTP_TEMPLATE = 'template_96hc1vr'; // <-- create this in EmailJS
+var EJS_OTP_TEMPLATE = 'template_96hc1vr';
 var EJS_KEY      = 'utb96sMAnKoOEjW68';
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -786,7 +786,7 @@ function initMaps() {
         setPill('ok',routeKm+' km');
         var roundtrip = routeKm * 2;
         var noteExtra = (routeKm > 150 && !isIsland && !isBornholm && !isAbroad) ? ' · Max. 300 km faktureres (tur-retur).' : '';
-        setNote('Vejafstand fra Galten: '+routeKm+' km (tur-retur: '+roundtrip+' km)'+noteExtra);
+        setNote('Vejafstand fra Galten: '+routeKm+' km (tur-retur: '+roundtrip+' km) – km over 300 faktureres ikke'+noteExtra);
       } else {
         routeKm = null; setPill('err','?');
         if (isAbroad) setNote('Udenlandsk destination – endelig transportpris aftales særskilt.');
@@ -857,8 +857,8 @@ function refreshSvcUI() {
   updatePlanting();
 }
 function updatePlanting() {
-  var noBlt = (selType==='building' || selType==='road');
-  if (noBlt) hide('planting-field'); else show('planting-field');
+  var showBlt = (selType==='solar' || selType==='combined');
+  if (showBlt) show('planting-field'); else hide('planting-field');
 }
 
 // ── Viewpoints ─────────────────────────────────────────────────────────────
@@ -1100,12 +1100,1248 @@ function sendLead() {
     btn.disabled=false;
     btn.textContent='Send detaljeret prisestimat til min e-mail';
   }).catch(function(err){
-    // If OTP template missing, fall back to showing result directly
-    // Remove this fallback once EJS_OTP_TEMPLATE is configured
-    console.warn('OTP email failed – showing result directly. Set up EJS_OTP_TEMPLATE in EmailJS.', err);
+    // Email failed (e.g. template not yet set up) – still show OTP panel
+    // but warn the user that email may not have arrived
+    hide('lead-form');
+    el('otp-email-display').textContent = email;
+    show('otp-panel');
+    setupOtpInputs();
     btn.disabled=false;
     btn.textContent='Send detaljeret prisestimat til min e-mail';
+    el('otp-err').textContent = 'Bemærk: Vi kunne ikke sende koden til din e-mail. Tjek at EJS_OTP_TEMPLATE er opsat korrekt i EmailJS.';
+    show('otp-err');
+  });
+}
+
+// ── OTP digit inputs ────────────────────────────────────────────────────────
+function setupOtpInputs() {
+  for (var i=0;i<6;i++) {
+    (function(idx){
+      var inp = el('d'+idx);
+      inp.value='';
+      inp.oninput=function(e){
+        var v=this.value.replace(/\D/g,'');
+        this.value=v.slice(-1);
+        if (v && idx<5) el('d'+(idx+1)).focus();
+        if (getOtpValue().length===6) verifyOtp();
+      };
+      inp.onkeydown=function(e){
+        if (e.key==='Backspace' && !this.value && idx>0) el('d'+(idx-1)).focus();
+      };
+    })(i);
+  }
+  el('d0').focus();
+}
+function getOtpValue() {
+  var v='';
+  for (var i=0;i<6;i++) v+=el('d'+i).value;
+  return v;
+}
+
+function verifyOtp() {
+  var entered = getOtpValue();
+  if (entered.length<6) { el('otp-err').textContent='Indtast alle 6 cifre'; show('otp-err'); return; }
+  if (entered === otpCode) {
+    hide('otp-err'); hide('otp-panel');
+    otpVerified=true;
     showFull();
+  } else {
+    el('otp-err').textContent='Forkert kode – tjek din e-mail og prøv igen';
+    show('otp-err');
+    for (var i=0;i<6;i++) el('d'+i).style.borderColor='#c0392b';
+  }
+}
+
+function resendOtp() {
+  otpCode = genOTP();
+  var email = el('c-email').value.trim();
+  var name = el('c-firstname').value.trim()+' '+el('c-lastname').value.trim();
+  emailjs.send(EJS_SERVICE, EJS_OTP_TEMPLATE, {
+    to_email: email, to_name: name,
+    reply_to: 'info@mikkelbarker.dk',
+    subject: 'Din nye bekræftelseskode – Mikkel Barker',
+    otp_code: otpCode,
+    from_name: 'Mikkel Barker'
+  }).then(function(){
+    el('otp-resend').textContent='Koden er gensendt ✓';
+  }).catch(function(){
+    el('otp-resend').textContent='Kunne ikke gensende – prøv igen';
+  });
+}
+
+// ── Show full result ────────────────────────────────────────────────────────
+function showFull() {
+  var r = calcR;
+  el('f-total').textContent = fmtDKK(r.totalEx);
+  el('f-sub').textContent   = 'Inkl. moms: '+fmtDKK(r.totalInc)+'  ·  Alle priser er ekskl. moms';
+
+  var html='';
+  var vpRep = r.vpPhoto || r.vpDrone || r.vp;
+  var unitPrice = Math.round(r.totalEx/vpRep);
+  var has3d = selSvc.indexOf('3d')!==-1;
+  var unitLabel = has3d ? 'Ca. stykpris pr. visualisering' : 'Ca. stykpris pr. foto';
+  html+='<div style="padding-bottom:12px;margin-bottom:10px;border-bottom:.5px solid rgba(255,255,255,.2)">';
+  html+='<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:4px">'+unitLabel+'</div>';
+  html+='<div style="font-size:2rem;font-weight:400;color:#fff;font-family:var(--font-display);line-height:1.1">'+fmtDKK(unitPrice)+'</div>';
+  html+='<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:3px">ekskl. moms';
+  if (r.vpPhoto && r.vpDrone) html+=' &nbsp;·&nbsp; '+r.vpPhoto+' terrænstandpunkter / '+r.vpDrone+' dronestandpunkter';
+  else if (r.vpPhoto) html+=' &nbsp;·&nbsp; baseret på '+r.vpPhoto+' standpunkter';
+  else if (r.vpDrone) html+=' &nbsp;·&nbsp; baseret på '+r.vpDrone+' dronestandpunkter';
+  html+='</div></div>';
+
+  for (var s=0;s<r.sections.length;s++) {
+    var sec=r.sections[s];
+    html+='<div class="bk-sec">'+sec.h+'</div>';
+    for (var l=0;l<sec.lines.length;l++) {
+      var line=sec.lines[l];
+      if (line.note) html+='<div class="bk-row"><span>'+line.l+'</span><span style="color:rgba(255,255,255,.35);font-style:italic">Tillæg – aftales</span></div>';
+      else html+='<div class="bk-row"><span>'+line.l+'</span><span>'+fmtDKK(line.v)+'</span></div>';
+    }
+  }
+  html+='<div class="bk-row" style="border-top:.5px solid rgba(255,255,255,.15);margin-top:8px;padding-top:10px;color:#fff;font-weight:500"><span>I alt ekskl. moms</span><span class="g">'+fmtDKK(r.totalEx)+'</span></div>';
+  html+='<div class="bk-row" style="color:rgba(255,255,255,.45);font-size:12px"><span>Moms 25%</span><span>'+fmtDKK(r.totalEx*0.25)+'</span></div>';
+  html+='<div class="bk-row" style="color:rgba(255,255,255,.45);font-size:12px"><span>I alt inkl. moms</span><span>'+fmtDKK(r.totalInc)+'</span></div>';
+  if (has3d) html+='<div style="margin-top:10px;padding-top:10px;border-top:.5px solid rgba(255,255,255,.1);font-size:12px;color:rgba(255,255,255,.4);font-style:italic">Bemærk: Omfanget af 3D-modellen (simpel eller kompleks) kan have betydning for det endelige tilbud, som aftales nærmere via e-mail eller telefon.</div>';
+  el('bk-list').innerHTML=html;
+
+  el('info-tiles').innerHTML=
+    '<div class="tile"><div class="v">'+(r.vpPhoto?r.vpPhoto:'–')+'</div><div class="l">Terrænstandpunkter</div></div>'+
+    (r.vpDrone?'<div class="tile"><div class="v">'+r.vpDrone+'</div><div class="l">Dronestandpunkter</div></div>':'')+
+    '<div class="tile"><div class="v">'+(r.dist>0?r.dist+' km':'–')+'</div><div class="l">Vejafstand</div></div>'+
+    '<div class="tile"><div class="v">'+selSvc.map(function(s){return s==='photo'?'Foto':s==='drone'?'Drone':'3D';}).join('+')+'</div><div class="l">Ydelser</div></div>'+
+    '<div class="tile"><div class="v">'+fmtDKK(r.totalEx)+'</div><div class="l">Ekskl. moms</div></div>';
+
+  show('full-result');
+}
+
+function reset() {
+  hide('step2'); show('step1');
+  hide('full-result'); hide('otp-panel');
+  show('lead-form'); show('back-btn');
+  el('send-btn').disabled=false;
+  el('send-btn').textContent='Send detaljeret prisestimat til min e-mail';
+  otpCode=''; otpVerified=false;
+  el('step1').scrollIntoView({behavior:'smooth',block:'start'});
+  try { window.scrollTo({top:0,behavior:'smooth'}); } catch(e){}
+}
+
+
+// Init EmailJS
+emailjs.init({ publicKey: EJS_KEY });
+</script>
+</body>
+</html>YPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prisberegner – Mikkel Barker</title>
+
+<!-- TT Ramillas via Google Fonts fallback – replace with your licensed version if self-hosting -->
+<!-- IBM Plex Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+
+<style>
+/* ── If you self-host TT Ramillas, add @font-face here ── */
+/* Example:
+@font-face {
+  font-family: 'TT Ramillas';
+  src: url('fonts/TTRamillas-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+}
+*/
+
+/* ══════════════════════════════════════════════════════
+   CSS DESIGN TOKENS – controlled from Google Sheet
+   (values below are defaults; JS overwrites them on load)
+══════════════════════════════════════════════════════ */
+:root {
+  /* Colors */
+  --ink:       #1F1F1F;
+  --ink2:      #4F4F4F;
+  --ink3:      #949494;
+  --paper:     #F2F2F2;
+  --surface:   #E8E8E8;
+  --white:     #ffffff;
+  --border:    rgba(31,31,31,0.10);
+  --border2:   rgba(31,31,31,0.18);
+  --accent:    #FF6600;       /* Color 6 from brand */
+  --accent-l:  rgba(255,102,0,0.08);
+  --dark:      #1F1F1F;       /* Color 5 */
+  --dark-l:    rgba(31,31,31,0.06);
+
+  /* Shape */
+  --radius:    8px;
+  --radius-lg: 14px;
+  --radius-btn:999px;        /* pill buttons */
+  --border-w:  0.5px;
+
+  /* Typography */
+  --font-display: 'TT Ramillas', 'Georgia', serif;
+  --font-body:    'IBM Plex Sans', sans-serif;
+
+  /* Font sizes – controlled from Google Sheet */
+  --fs-body:      14px;   /* Brødtekst / inputfelter */
+  --fs-small:     12px;   /* Hjælpetekst og labels */
+  --fs-label:     13px;   /* Feltlabels */
+  --fs-btn:       15px;   /* Knaptext */
+  --fs-card-h:    1.15rem;/* Korttitler */
+  --fs-price:     clamp(2rem,6vw,3.5rem); /* Stor prisvisning */
+  --fs-range:     clamp(1.8rem,5vw,2.8rem); /* Prisinterval teaser */
+  --fs-sec-lbl:   11px;   /* Sektionslabels */
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
+
+body {
+  font-family: var(--font-body);
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.65;
+  font-weight: 300;
+  font-size: var(--fs-body);
+}
+.wrap { max-width: 840px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem }
+
+/* ── Section label ── */
+.sec-lbl {
+  font-size: var(--fs-sec-lbl);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 400;
+}
+.sec-lbl::after { content:''; flex:1; height:var(--border-w); background:var(--border) }
+
+/* ── Cards ── */
+.card {
+  background: var(--white);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+.card h3 {
+  font-family: var(--font-display);
+  font-size: var(--fs-card-h);
+  font-weight: 400;
+  margin-bottom: .2rem;
+  letter-spacing: -.01em;
+}
+.card .sub { font-size: var(--fs-label); color: var(--ink3); margin-bottom: 1.25rem; font-weight: 300 }
+
+/* ── Form elements ── */
+label.fl { display:block; font-size:var(--fs-label); color:var(--ink2); margin-bottom:5px; font-weight:500 }
+input[type=text],input[type=email],input[type=tel],input[type=number],select,textarea {
+  width:100%; padding:10px 13px;
+  border: var(--border-w) solid var(--border2);
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: var(--fs-body); color: var(--ink); background: var(--paper);
+  outline:none; transition:border-color .15s; appearance:none; -webkit-appearance:none;
+  font-weight: 300;
+}
+input:focus,select:focus,textarea:focus { border-color: var(--accent); background: #fff }
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%234F4F4F' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  padding-right: 36px; cursor: pointer;
+}
+.field { margin-bottom: 1.1rem }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem }
+@media(max-width:520px){ .row2{grid-template-columns:1fr} }
+
+/* ── Address / distance ── */
+.addr-wrap { position:relative }
+.addr-wrap input { padding-right:100px }
+.pac-container {
+  z-index:9999; font-family:var(--font-body); font-size:14px;
+  border-radius:var(--radius); border:var(--border-w) solid var(--border2);
+}
+.km-pill {
+  position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  font-size:12px; font-weight:500; padding:3px 10px; border-radius:999px;
+  white-space:nowrap; pointer-events:none; display:none;
+}
+.km-pill.ok  { display:block; color:var(--accent); background:var(--accent-l) }
+.km-pill.spin{ display:block; color:var(--ink3); background:var(--surface) }
+.km-pill.err { display:block; color:#a33; background:#fdecea }
+.km-note { font-size:var(--fs-small); color:var(--ink3); margin-top:5px; min-height:1.3em }
+
+/* ── Toggle buttons ── */
+.tog-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-top:4px }
+.tog {
+  padding:10px 14px;
+  border: var(--border-w) solid var(--border2);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font-family: var(--font-body); font-size:var(--fs-label); color:var(--ink2);
+  cursor:pointer; transition:all .15s; text-align:center; user-select:none;
+  font-weight: 400;
+}
+.tog:hover { border-color:var(--accent); color:var(--ink) }
+.tog.on { background:var(--accent-l); border-color:var(--accent); color:var(--accent); font-weight:500 }
+
+/* ── Viewpoints ── */
+.vp-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:start }
+.vp-custom { width:100px }
+
+/* ── Info boxes ── */
+.island-box {
+  background:var(--surface); border-radius:var(--radius); padding:.85rem 1rem;
+  font-size:13px; color:var(--ink2); margin-top:.85rem;
+  display:flex; align-items:flex-start; gap:8px;
+}
+.island-box.show { display:flex }
+.warn-box { background:#fdecea; border-radius:var(--radius); padding:.75rem 1rem; font-size:13px; color:#a33; margin-bottom:.75rem }
+.hint { font-size:var(--fs-small); color:var(--ink3); margin-top:4px; line-height:1.5 }
+
+/* ── Teaser (blurred price) ── */
+.teaser {
+  background: var(--dark);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.teaser::before {
+  content:''; position:absolute; top:-80px; right:-80px;
+  width:220px; height:220px; border-radius:50%;
+  background:rgba(255,255,255,.04);
+}
+.t-lbl { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.5rem }
+.t-range {
+  font-family: var(--font-display);
+  font-size: var(--fs-range);
+  font-weight: 400; color:#fff; line-height:1.1; margin-bottom:.3rem;
+}
+.t-sub { font-size:var(--fs-label); color:rgba(255,255,255,.45); font-weight:300; margin-bottom:1.5rem }
+.blur-row {
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(255,255,255,.07); border-radius:var(--radius);
+  padding:.85rem 1rem; font-size:13px; color:rgba(255,255,255,.5);
+  gap:1rem; flex-wrap:wrap;
+}
+.blur-val { font-family:monospace; filter:blur(5px); user-select:none; color:rgba(255,255,255,.7) }
+.unlock-hint { font-size:12px; color:rgba(255,255,255,.4); margin-top:.75rem; text-align:center }
+
+/* ── Lead form card ── */
+.lead-card {
+  background: var(--white);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.lead-card h3 { font-family:var(--font-display); font-size:1.2rem; font-weight:400; margin-bottom:.25rem }
+.lead-card .sub { font-size:var(--fs-label); color:var(--ink3); margin-bottom:1.5rem; font-weight:300 }
+
+/* Email verification states */
+.email-status { font-size:12px; margin-top:4px; min-height:1.2em }
+.email-status.pending { color:var(--ink3) }
+.email-status.sent    { color:#1a7a3a }
+.email-status.error   { color:#c0392b }
+
+/* ── Result box ── */
+.result-box {
+  background: var(--dark); color:#fff;
+  border-radius: var(--radius-lg);
+  padding: 2rem; margin-bottom:1rem;
+  position:relative; overflow:hidden;
+}
+.result-box::before {
+  content:''; position:absolute; top:-80px; right:-80px;
+  width:220px; height:220px; border-radius:50%;
+  background:rgba(255,255,255,.04);
+}
+.f-lbl { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.5rem }
+.f-price { font-family:var(--font-display); font-size:var(--fs-price); font-weight:400; color:#fff; line-height:1.1; margin-bottom:.2rem }
+.f-sub { font-size:13px; color:rgba(255,255,255,.45); font-weight:300; margin-bottom:1.5rem }
+.bk { background:rgba(255,255,255,.07); border-radius:var(--radius); padding:1rem }
+.bk-sec { font-size:var(--fs-sec-lbl); letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.3); margin:12px 0 4px }
+.bk-sec:first-child { margin-top:0 }
+.bk-row { display:flex; justify-content:space-between; padding:5px 0; font-size:var(--fs-label); color:rgba(255,255,255,.62) }
+.bk-row.total { border-top:.5px solid rgba(255,255,255,.15); margin-top:8px; padding-top:10px; color:#fff; font-weight:500 }
+.g { color:var(--accent) }
+
+/* ── Info tiles ── */
+.info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:1.5rem }
+.tile { background:var(--surface); border-radius:var(--radius); padding:.85rem 1rem }
+.tile .v { font-size:1.2rem; font-weight:500; color:var(--ink); margin-bottom:2px }
+.tile .l { font-size:var(--fs-small); color:var(--ink3) }
+
+/* ── Success ── */
+.success { text-align:center; padding:2rem 1rem }
+.sico { width:52px; height:52px; border-radius:50%; background:var(--accent-l); display:flex; align-items:center; justify-content:center; margin:0 auto 1.1rem; font-size:20px; color:var(--accent) }
+.success h3 { font-family:var(--font-display); font-size:1.4rem; font-weight:400; margin-bottom:.4rem }
+.success p { font-size:var(--fs-label); color:var(--ink3) }
+
+/* ── Buttons ── */
+.btn {
+  width:100%; padding:14px;
+  background: var(--dark); color:#fff; border:none;
+  border-radius: var(--radius-btn);
+  font-family:var(--font-body); font-size:var(--fs-btn); font-weight:500;
+  cursor:pointer; transition:background .15s,transform .1s;
+}
+.btn:hover { opacity:.88 }
+.btn:active { transform:scale(.99) }
+.btn:disabled { background:var(--ink3); cursor:not-allowed }
+
+.btn-pill {
+  padding:8px 16px; background:transparent; color:var(--accent);
+  border: var(--border-w) solid rgba(255,102,0,.3);
+  border-radius:999px; font-family:var(--font-body); font-size:12px;
+  cursor:pointer; transition:all .15s; display:block; width:fit-content;
+}
+.btn-pill:hover { background:var(--accent-l) }
+
+.small { font-size:var(--fs-small); color:var(--ink3); text-align:center; margin-top:.9rem; line-height:1.65 }
+.err { font-size:var(--fs-small); color:#c0392b; margin-top:4px }
+.hidden { display:none!important }
+
+/* ── OTP verification panel ── */
+.otp-panel {
+  background: #fff9f5;
+  border: var(--border-w) solid rgba(255,102,0,.25);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.otp-panel h4 { font-family:var(--font-display); font-size:1.1rem; font-weight:400; margin-bottom:.3rem }
+.otp-panel p  { font-size:13px; color:var(--ink3); margin-bottom:1.25rem }
+.otp-input {
+  display:flex; gap:10px; justify-content:center; margin-bottom:1rem;
+  flex-wrap:wrap;
+}
+.otp-digit {
+  width:52px; height:60px; text-align:center;
+  font-size:1.4rem; font-weight:600; letter-spacing:0;
+  border: var(--border-w) solid var(--border2);
+  border-radius: var(--radius); background: var(--paper);
+  font-family: var(--font-body);
+  outline:none; transition:border-color .15s;
+}
+.otp-digit:focus { border-color:var(--accent); background:#fff }
+.otp-resend { font-size:12px; color:var(--ink3); margin-top:.5rem; cursor:pointer; text-decoration:underline }
+.otp-err { font-size:13px; color:#c0392b; margin-top:.5rem; min-height:1.2em }
+
+/* Loading spinner */
+.spinner {
+  display:inline-block; width:16px; height:16px;
+  border:2px solid rgba(255,255,255,.3); border-top-color:#fff;
+  border-radius:50%; animation:spin .6s linear infinite;
+  vertical-align:middle; margin-right:6px;
+}
+@keyframes spin { to { transform:rotate(360deg) } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══ STEP 1 ══════════════════════════════════════════════════════════════ -->
+<div id="step1">
+  <p class="sec-lbl">Projektdetaljer</p>
+
+  <div class="card">
+    <h3>Om projektet</h3>
+    <p class="sub">Skriv adressen – vi henter vejkilometer fra Galten automatisk</p>
+
+    <div class="field">
+      <label class="fl">Projektets adresse / by</label>
+      <div class="addr-wrap">
+        <input type="text" id="address" placeholder="F.eks. Odense, Ringkøbing eller Rønne" autocomplete="off">
+        <span class="km-pill" id="km-pill"></span>
+      </div>
+      <p class="km-note" id="km-note">Skriv adresse eller by – afstanden beregnes automatisk.</p>
+      <div id="island-note" class="island-box hidden" style="margin-top:.6rem">
+        <span style="font-size:16px;flex-shrink:0">⛴</span>
+        <span id="island-name-text">Denne destination</span><span> kræver ekstra kilometer, færge eller fly og muligvis overnatning, som aftales efter dialog.</span>
+      </div>
+      <div id="bornholm-note" class="island-box hidden" style="margin-top:.6rem">
+        <span style="font-size:16px;flex-shrink:0">⛴</span>
+        <span>Bornholm kræver ekstra kilometer, færge eller fly og muligvis overnatning, som aftales efter dialog.</span>
+      </div>
+      <div id="abroad-note" class="island-box hidden" style="margin-top:.6rem">
+        <span style="font-size:16px;flex-shrink:0">✈️</span>
+        <span id="abroad-name-text">Denne destination</span><span> kræver ekstra kilometer, færge eller fly og muligvis overnatning, som aftales efter dialog.</span>
+      </div>
+      
+      <p id="err-address" class="err hidden">Indtast venligst en adresse eller by</p>
+    </div>
+
+    <div class="field">
+      <label class="fl">Projekttype</label>
+      <div class="tog-grid" id="type-grid">
+        <button class="tog" data-val="solar"    onclick="setType(this)">Solcelleanlæg</button>
+        <button class="tog" data-val="wind"     onclick="setType(this)">Vindmøller</button>
+        <button class="tog" data-val="combined" onclick="setType(this)">Sol + vind</button>
+        <button class="tog" data-val="building" onclick="setType(this)">Byggeri</button>
+        <button class="tog" data-val="road"     onclick="setType(this)">Vejanlæg</button>
+        <button class="tog" data-val="other"    onclick="setType(this)">Andet</button>
+      </div>
+      <p id="err-type" class="err hidden" style="margin-top:6px">Vælg venligst en projekttype</p>
+    </div>
+
+    <div id="other-field" class="field hidden">
+      <label class="fl">Beskriv projektet kort</label>
+      <input type="text" id="other-desc" placeholder="F.eks. biogasanlæg, broanlæg...">
+    </div>
+
+    <div id="hectares-field" class="field hidden">
+      <label class="fl">Anlæggets størrelse (hektar)</label>
+      <select id="hectares">
+        <option value="">Vælg interval</option>
+        <option value="5">Op til 10 ha</option>
+        <option value="20">10–30 ha</option>
+        <option value="50">30–75 ha</option>
+        <option value="100">75–150 ha</option>
+        <option value="150">Over 150 ha</option>
+      </select>
+      <p id="err-hectares" class="err hidden">Vælg venligst anlæggets størrelse</p>
+    </div>
+
+    <div id="windmills-field" class="field hidden">
+      <label class="fl">Antal vindmøller</label>
+      <div class="vp-row">
+        <select id="windmills" onchange="onWindChange()">
+          <option value="">Vælg interval</option>
+          <option value="2">1–3 vindmøller</option>
+          <option value="7">4–10 vindmøller</option>
+          <option value="15">11–20 vindmøller</option>
+          <option value="custom">Mere end 20 – skriv antal</option>
+        </select>
+        <input type="number" id="windmills-custom" class="vp-custom hidden" min="21" placeholder="Antal">
+      </div>
+      <p id="err-windmills" class="err hidden">Vælg venligst antal vindmøller</p>
+      <p id="windmills-custom-err" class="err hidden">Skriv et antal over 20</p>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <h3>Ydelser og omfang</h3>
+    <p class="sub">Vælg de ydelser der ønskes – de kan kombineres frit</p>
+
+    <div class="field">
+      <label class="fl">Ydelser</label>
+      <div class="tog-grid">
+        <button class="tog on" data-svc="photo" onclick="toggleSvc(this)">Terrænfotografi</button>
+        <button class="tog"    data-svc="drone" onclick="toggleSvc(this)">Dronefotografi</button>
+        <button class="tog"    data-svc="3d"    onclick="toggleSvc(this)">3D-visualisering</button>
+      </div>
+      <p id="err-svc" class="err hidden" style="margin-top:6px">Vælg mindst én ydelse</p>
+      <p id="err-3d"  class="err hidden" style="margin-top:6px">3D-visualisering forudsætter terrænfotografi eller dronefotografi</p>
+    </div>
+
+    <!-- Terrænfotografi standpunkter (vises kun når photo er valgt) -->
+    <div id="vp-photo-field" class="field" style="margin-top:1rem">
+      <label class="fl">Antal standpunkter – Terrænfotografi</label>
+      <div class="vp-row">
+        <select id="photo-vp" onchange="onVpChange('photo')">
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+          <option value="4" selected>4</option><option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option>
+          <option value="custom">Mere end 7...</option>
+        </select>
+        <input type="number" id="photo-vp-custom" class="vp-custom hidden" min="8" placeholder="Antal">
+      </div>
+      <p class="hint">Et standpunkt er et geografisk sted hvorfra projektet synliggøres.</p>
+      <p id="photo-vp-err" class="err hidden">Skriv et antal over 7</p>
+    </div>
+
+    <!-- Dronefotografi standpunkter (vises kun når drone er valgt) -->
+    <div id="vp-drone-field" class="field hidden" style="margin-top:1rem">
+      <label class="fl">Antal standpunkter – Dronefotografi</label>
+      <div class="vp-row">
+        <select id="drone-vp" onchange="onVpChange('drone')">
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+          <option value="4" selected>4</option><option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option>
+          <option value="custom">Mere end 7...</option>
+        </select>
+        <input type="number" id="drone-vp-custom" class="vp-custom hidden" min="8" placeholder="Antal">
+      </div>
+      <p id="drone-vp-err" class="err hidden">Skriv et antal over 7</p>
+    </div>
+
+    <div id="d3-options" class="hidden">
+      <div id="d3-warn" class="warn-box hidden">
+        3D-visualisering forudsætter terrænfotografi eller dronefotografi.
+      </div>
+      <div class="field">
+        <label class="fl">3D-model</label>
+        <select id="model-src">
+          <option value="build">Inkludér opbygning af 3D-model</option>
+          <option value="provided">Bygherre leverer 3D-modellen</option>
+        </select>
+        <p class="hint">Bemærk: Omfanget af 3D-modellen (simpel eller kompleks) kan have betydning for det endelige tilbud, som aftales nærmere via e-mail eller telefon.</p>
+      </div>
+      <div class="field" id="planting-field">
+        <label class="fl">Tilføj beplantningsbælte?</label>
+        <select id="planting">
+          <option value="none">Nej</option>
+          <option value="yes">Ja – visualisering af udvokset beplantningsbælte</option>
+        </select>
+        <p class="hint">År 1 (nyetableret) er inkluderet i den første visualisering.</p>
+      </div>
+    </div>
+  </div>
+
+  <p style="font-size:13px;color:var(--ink2);background:var(--surface);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:.75rem;line-height:1.6">
+    📧 <strong>Sådan fungerer det:</strong> Når du trykker beregn, udfylder du navn og e-mail – vi sender en bekræftelseskode til din indbakke. Koden giver dig adgang til det detaljerede prisestimat direkte på siden.
+  </p>
+  <button class="btn" onclick="runCalc()">Beregn prisestimat</button>
+  <p class="small">Estimatet er vejledende og ikke bindende for nogen part.</p>
+</div>
+
+<!-- ══ STEP 2 ══════════════════════════════════════════════════════════════ -->
+<div id="step2" class="hidden">
+  <p class="sec-lbl">Dit prisestimat</p>
+
+  <div class="teaser">
+    <p class="t-lbl">Estimeret prisinterval ekskl. moms</p>
+    <p class="t-range" id="teaser-range">–</p>
+    <p class="t-sub" id="teaser-sub"></p>
+    <div style="margin-bottom:1rem">
+      <p style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:3px" id="teaser-unit-label">Ca. stykpris pr. foto</p>
+      <p style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:#fff;line-height:1.1" id="teaser-unit-price">–</p>
+    </div>
+    <div class="blur-row">
+      <span>Detaljeret specifikation pr. post</span>
+      <span class="blur-val" id="blur-val">XX.XXX kr. ekskl. moms</span>
+    </div>
+    <p class="unlock-hint">Indtast din e-mail herunder – vi sender det detaljerede prisestimat direkte til dig</p>
+  </div>
+
+  <!-- Lead form -->
+  <div class="lead-card" id="lead-form">
+    <h3>Modtag det detaljerede prisestimat</h3>
+    <p class="sub">Vi sender estimatet til din e-mail, så du er sikker på at modtage det korrekt – ingen forpligtelse</p>
+    <div class="row2">
+      <div class="field">
+        <label class="fl">Fornavn *</label>
+        <input type="text" id="c-firstname" placeholder="Fornavn">
+      </div>
+      <div class="field">
+        <label class="fl">Efternavn *</label>
+        <input type="text" id="c-lastname" placeholder="Efternavn">
+      </div>
+    </div>
+    <div class="field">
+      <label class="fl">E-mail *</label>
+      <input type="email" id="c-email" placeholder="din@mail.dk" autocomplete="email">
+      <p class="email-status pending" id="email-status"></p>
+    </div>
+    <div class="field">
+      <label class="fl">Telefon <span style="font-weight:300;color:var(--ink3)">(valgfrit)</span></label>
+      <input type="tel" id="c-phone" placeholder="Valgfrit">
+    </div>
+    <div class="field">
+      <label class="fl">Bemærkninger <span style="font-weight:300;color:var(--ink3)">(valgfrit)</span></label>
+      <textarea id="c-notes" rows="2" placeholder="Tidsfrist, særlige ønsker, spørgsmål..."></textarea>
+    </div>
+    <button class="btn" id="send-btn" onclick="sendLead()">Send detaljeret prisestimat til min e-mail</button>
+    <p class="small" style="margin-top:.75rem">Det detaljerede prisestimat sendes til din e-mail. Ved at sende giver du samtykke til at Mikkel Barker ApS kontakter dig med tilbud. Ingen videregivelse til tredjepart.</p>
+  </div>
+
+  <!-- OTP verification step -->
+  <div class="otp-panel hidden" id="otp-panel">
+    <h4>Bekræft din e-mail</h4>
+    <p>Vi har sendt en 6-cifret kode til <strong id="otp-email-display"></strong><br>Indtast koden herunder for at se dit detaljerede prisestimat</p>
+    <div class="otp-input" id="otp-digits">
+      <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" id="d0">
+      <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" id="d1">
+      <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" id="d2">
+      <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" id="d3">
+      <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" id="d4">
+      <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" id="d5">
+    </div>
+    <p class="otp-err hidden" id="otp-err">Forkert kode – prøv igen</p>
+    <button class="btn" id="otp-verify-btn" onclick="verifyOtp()">Bekræft og vis prisestimat</button>
+    <p class="otp-resend" id="otp-resend" onclick="resendOtp()">Send koden igen</p>
+  </div>
+
+  <!-- Full result (shown after OTP verified) -->
+  <div id="full-result" class="hidden">
+    <div class="result-box">
+      <p class="f-lbl">Detaljeret prisestimat ekskl. moms</p>
+      <p class="f-price" id="f-total">–</p>
+      <p class="f-sub" id="f-sub"></p>
+      <div class="bk" id="bk-list"></div>
+    </div>
+    <div style="margin-top:1rem">
+      <div class="info-grid" id="info-tiles"></div>
+      <button class="btn-pill" onclick="reset()" style="margin-bottom:1.5rem">← Lav ny beregning</button>
+      <div class="success">
+        <div class="sico">✓</div>
+        <h3>Tak – din forespørgsel er modtaget</h3>
+        <p>Jeg kigger på det så hurtigt jeg kan og gør mit bedste for at vende tilbage inden for 2 hverdage.<br><br>Haster det? Ring direkte på <strong>29 61 34 90</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-pill" id="back-btn" style="margin-top:1.5rem" onclick="reset()">← Ret beregning</button>
+</div>
+
+</div><!-- /wrap -->
+
+<!-- EmailJS -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- Google Maps -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC_X_a_NUof4sXlPDa3qP6bj3KpNXPsMrQ&libraries=places&language=da&region=DK&callback=initMaps" async defer></script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// GOOGLE SHEET CONFIG
+// Publish your Sheet as CSV (File → Share → Publish to web → CSV) for each
+// named range or sheet tab, then paste the URLs below.
+//
+// Expected sheet structure – two tabs:
+//   Tab 1: "Priser"  — key/value rows, e.g.  start | 1275
+//   Tab 2: "Design"  — key/value rows, e.g.  accent | #FF6600
+//
+// The URLs below point to each tab exported as CSV.
+// Replace SPREADSHEET_ID with your own sheet's ID.
+// ══════════════════════════════════════════════════════════════════════════
+var SHEET_PRICES_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdap0f1jHYDwqbzYtinZXL1g2m7xoSdmmTW4YFXTERbMOFzr8xrfr8q5cbUOwh5n-9QcAz3Ek7Csnx/pub?gid=0&single=true&output=csv';
+var SHEET_DESIGN_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdap0f1jHYDwqbzYtinZXL1g2m7xoSdmmTW4YFXTERbMOFzr8xrfr8q5cbUOwh5n-9QcAz3Ek7Csnx/pub?gid=262580509&single=true&output=csv';
+
+// ── Default prices (used if sheet can't be loaded) ──────────────────────
+var P = {
+  start:    1275,
+  vpRate:   1725,
+  gps:      1350,
+  transHr:   675,
+  kmRate:   3.81,
+  maxKm:     300,
+  maxHr:       3
+};
+var DR = {
+  vpRate: 1725
+};
+var D = {
+  bSm:   4500, bMd:   5500, bLg:   7000, bXl:   8500, bXxl: 10000,
+  bBld:  4000, bProv: 1200,
+  yr1:   1875, yr10:   785, vis:    785
+};
+
+// ── Default design tokens (used if sheet can't be loaded) ───────────────
+var DESIGN_DEFAULTS = {
+  accent:       '#FF6600',
+  dark:         '#1F1F1F',
+  paper:        '#F2F2F2',
+  surface:      '#E8E8E8',
+  radius:       '8px',
+  'radius-lg':  '14px',
+  'radius-btn': '999px',
+  'border-w':   '0.5px'
+};
+
+// ── Parse CSV helper ────────────────────────────────────────────────────
+function parseCSV(text) {
+  var map = {};
+  var lines = text.trim().split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var firstCell = lines[i].split(',')[0].replace(/"/g,'').trim().toLowerCase();
+    if (firstCell === 'nøgle' || firstCell === 'key' || firstCell === 'noegle') continue;
+    var parts = lines[i].split(',');
+    if (parts.length >= 2) {
+      var key = parts[0].trim().replace(/"/g,'');
+      var val = parts.slice(1).join(',').trim().replace(/"/g,'');
+      if (key) map[key] = val;
+    }
+  }
+  return map;
+}
+
+// ── Apply design tokens from sheet ──────────────────────────────────────
+function applyDesign(map) {
+  var root = document.documentElement;
+  var tokens = ['accent','dark','paper','surface','radius','radius-lg','radius-btn','border-w',
+                'ink','ink2','ink3','white',
+                'fs-body','fs-small','fs-label','fs-btn','fs-card-h','fs-price','fs-range','fs-sec-lbl'];
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+    if (map[t]) root.style.setProperty('--' + t, map[t]);
+  }
+  // accent-l derived from accent (10% opacity version)
+  if (map['accent']) {
+    // Parse hex → rgba
+    var hex = map['accent'].replace('#','');
+    if (hex.length === 6) {
+      var r = parseInt(hex.substring(0,2),16);
+      var g = parseInt(hex.substring(2,4),16);
+      var b = parseInt(hex.substring(4,6),16);
+      root.style.setProperty('--accent-l', 'rgba('+r+','+g+','+b+',.08)');
+    }
+  }
+}
+
+// ── Apply price tokens from sheet ────────────────────────────────────────
+function applyPrices(map) {
+  function n(k,def) { return map[k] ? parseFloat(map[k]) : def; }
+  P.start    = n('start',    P.start);
+  P.vpRate   = n('vpRate',   P.vpRate);
+  P.gps      = n('gps',      P.gps);
+  P.transHr  = n('transHr',  P.transHr);
+  P.kmRate   = n('kmRate',   P.kmRate);
+  P.maxKm    = n('maxKm',    P.maxKm);
+  P.maxHr    = n('maxHr',    P.maxHr);
+  DR.vpRate  = n('droneVpRate', DR.vpRate);
+  D.bSm    = n('bSm',   D.bSm);
+  D.bMd    = n('bMd',   D.bMd);
+  D.bLg    = n('bLg',   D.bLg);
+  D.bXl    = n('bXl',   D.bXl);
+  D.bXxl   = n('bXxl',  D.bXxl);
+  D.bBld   = n('bBld',  D.bBld);
+  D.bProv  = n('bProv', D.bProv);
+  D.yr1    = n('yr1',   D.yr1);
+  D.yr10   = n('yr10',  D.yr10);
+  D.vis    = n('vis',   D.vis);
+}
+
+// ── Load from Google Sheet on startup ───────────────────────────────────
+function loadSheet() {
+  // Load prices
+  fetch(SHEET_PRICES_URL)
+    .then(function(r){ return r.text(); })
+    .then(function(txt){ applyPrices(parseCSV(txt)); })
+    .catch(function(){ /* use defaults silently */ });
+
+  // Load design
+  fetch(SHEET_DESIGN_URL)
+    .then(function(r){ return r.text(); })
+    .then(function(txt){ applyDesign(parseCSV(txt)); })
+    .catch(function(){ applyDesign(DESIGN_DEFAULTS); });
+}
+loadSheet();
+
+// ══════════════════════════════════════════════════════════════════════════
+// EmailJS
+// ══════════════════════════════════════════════════════════════════════════
+var EJS_SERVICE  = 'service_ym01yr9';
+var EJS_TEMPLATE = 'template_wqmeusj';
+// Template for sending OTP to user – you must create this template in EmailJS
+// with variables: {{to_email}}, {{to_name}}, {{otp_code}}, {{estimate_html}}
+var EJS_OTP_TEMPLATE = 'template_96hc1vr';
+var EJS_KEY      = 'utb96sMAnKoOEjW68';
+
+// ══════════════════════════════════════════════════════════════════════════
+// Constants
+// ══════════════════════════════════════════════════════════════════════════
+var VAT     = 1.25;
+var GALTEN  = '8464 Galten, Danmark';
+var ISLANDS = ['ærø','fanø','samsø','læsø','anholt','mandø','langeland',
+               'marstal','ærøskøbing','søby','fanø bad','nordby'];
+var BORNHOLM = ['bornholm','rønne','nexø','allinge','gudhjem','hasle','aakirkeby'];
+
+// ── State ──────────────────────────────────────────────────────────────────
+var selType    = null;
+var selSvc     = ['photo'];
+var routeKm    = null;
+var isIsland   = false;
+var isBornholm = false;
+var isAbroad   = false;
+var calcR      = {};
+var mapsReady  = false;
+var otpCode    = '';   // Generated 6-digit code
+var otpVerified= false;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id); }
+function show(id) { el(id).classList.remove('hidden'); }
+function hide(id) { el(id).classList.add('hidden'); }
+function fmtDKK(n) {
+  return new Intl.NumberFormat('da-DK',{style:'currency',currency:'DKK',maximumFractionDigits:0}).format(Math.round(n));
+}
+function genOTP() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+// ── Google Maps ────────────────────────────────────────────────────────────
+function initMaps() {
+  var distSvc = new google.maps.DistanceMatrixService();
+  var ac = new google.maps.places.Autocomplete(el('address'), {
+    fields: ['formatted_address','geometry','name','address_components'],
+    types: ['geocode','establishment']
+  });
+  ac.addListener('place_changed', function() {
+    var place = ac.getPlace();
+    if (!place || !place.geometry) {
+      setPill('err','?');
+      setNote('Adresse ikke fundet – prøv at vælge fra listen.');
+      routeKm = null; return;
+    }
+    var countryCode = '';
+    var comps = place.address_components || [];
+    for (var i=0;i<comps.length;i++) {
+      if (comps[i].types.indexOf('country')!==-1) { countryCode=comps[i].short_name.toUpperCase(); break; }
+    }
+    isAbroad = (countryCode !== '' && countryCode !== 'DK');
+    var combined = [place.formatted_address||'',place.name||'',comps.map(function(c){return c.long_name;}).join(' ')].join(' ').toLowerCase();
+    isBornholm = BORNHOLM.some(function(b){return combined.indexOf(b)!==-1;});
+    isIsland   = !isBornholm && ISLANDS.some(function(isl){return combined.indexOf(isl)!==-1;});
+    hide('island-note');
+    hide('bornholm-note');
+    hide('abroad-note');
+    var placeName = place.name || place.formatted_address || 'Denne destination';
+    if (isAbroad) {
+      var abt = document.getElementById('abroad-name-text');
+      if (abt) abt.textContent = placeName;
+      show('abroad-note');
+    } else if (isBornholm) {
+      show('bornholm-note');
+    } else if (isIsland) {
+      var islt = document.getElementById('island-name-text');
+      if (islt) islt.textContent = placeName;
+      show('island-note');
+    }
+    setPill('spin','…');
+    setNote('Beregner vejkilometer...');
+    distSvc.getDistanceMatrix({
+      origins:[GALTEN], destinations:[place.geometry.location],
+      travelMode:'DRIVING', unitSystem:google.maps.UnitSystem.METRIC
+    }, function(res,status) {
+      if (status==='OK' && res.rows[0].elements[0].status==='OK') {
+        routeKm = Math.round(res.rows[0].elements[0].distance.value/1000);
+        setPill('ok',routeKm+' km');
+        var roundtrip = routeKm * 2;
+        var noteExtra = (routeKm > 150 && !isIsland && !isBornholm && !isAbroad) ? ' · Max. 300 km faktureres (tur-retur).' : '';
+        setNote('Vejafstand fra Galten: '+routeKm+' km (tur-retur: '+roundtrip+' km) – km over 300 faktureres ikke'+noteExtra);
+      } else {
+        routeKm = null; setPill('err','?');
+        if (isAbroad) setNote('Udenlandsk destination – endelig transportpris aftales særskilt.');
+        else setNote('Kunne ikke beregne afstand – transport sættes til 0 kr.');
+      }
+    });
+  });
+  mapsReady = true;
+}
+function setPill(cls,txt) {
+  var p=el('km-pill'); p.className='km-pill '+cls; p.textContent=txt;
+}
+function setNote(txt) { el('km-note').textContent=txt; }
+function setNoteExtra(txt) { el('km-note').textContent=txt; }
+
+// ── Type toggle ────────────────────────────────────────────────────────────
+function setType(btn) {
+  var btns = document.querySelectorAll('#type-grid .tog');
+  for (var i=0;i<btns.length;i++) btns[i].classList.remove('on');
+  btn.classList.add('on');
+  selType = btn.getAttribute('data-val');
+  hide('hectares-field'); hide('windmills-field'); hide('other-field');
+  if (selType==='solar')    show('hectares-field');
+  else if (selType==='wind') show('windmills-field');
+  else if (selType==='combined') { show('hectares-field'); show('windmills-field'); }
+  else if (selType==='other') show('other-field');
+  updatePlanting();
+}
+
+function onWindChange() {
+  if (el('windmills').value === 'custom') { show('windmills-custom'); }
+  else { hide('windmills-custom'); hide('windmills-custom-err'); }
+}
+function readWindmills() {
+  var sel = el('windmills').value;
+  if (!sel) return null;
+  if (sel === 'custom') {
+    var n = parseInt(el('windmills-custom').value);
+    if (!n || n < 21) { show('windmills-custom-err'); return null; }
+    hide('windmills-custom-err'); return n;
+  }
+  hide('windmills-custom-err'); return parseInt(sel);
+}
+
+// ── Service toggles ────────────────────────────────────────────────────────
+function toggleSvc(btn) {
+  btn.classList.toggle('on');
+  selSvc = [];
+  var svcBtns = document.querySelectorAll('[data-svc].on');
+  for (var i=0;i<svcBtns.length;i++) selSvc.push(svcBtns[i].getAttribute('data-svc'));
+  refreshSvcUI();
+}
+function refreshSvcUI() {
+  var hasP = selSvc.indexOf('photo')!==-1;
+  var hasD = selSvc.indexOf('drone')!==-1;
+  var has3 = selSvc.indexOf('3d')!==-1;
+  var hasPhoto = hasP || hasD;
+
+  if (hasP) show('vp-photo-field'); else hide('vp-photo-field');
+  if (hasD) show('vp-drone-field'); else hide('vp-drone-field');
+
+  if (has3) {
+    show('d3-options');
+    if (hasPhoto) hide('d3-warn'); else show('d3-warn');
+  } else {
+    hide('d3-options');
+  }
+  updatePlanting();
+}
+function updatePlanting() {
+  var showBlt = (selType==='solar' || selType==='combined');
+  if (showBlt) show('planting-field'); else hide('planting-field');
+}
+
+// ── Viewpoints ─────────────────────────────────────────────────────────────
+function onVpChange(type) {
+  var selId = type==='photo' ? 'photo-vp' : 'drone-vp';
+  var custId = type==='photo' ? 'photo-vp-custom' : 'drone-vp-custom';
+  if (el(selId).value==='custom') show(custId); else hide(custId);
+}
+function readVp(type) {
+  var selId  = type==='photo' ? 'photo-vp' : 'drone-vp';
+  var custId = type==='photo' ? 'photo-vp-custom' : 'drone-vp-custom';
+  var errId  = type==='photo' ? 'photo-vp-err' : 'drone-vp-err';
+  if (el(selId).value==='custom') {
+    var n = parseInt(el(custId).value);
+    if (!n || n<8) { show(errId); return null; }
+    hide(errId); return n;
+  }
+  hide(errId); return parseInt(el(selId).value);
+}
+
+// ── Travel lines ────────────────────────────────────────────────────────────
+function travelLines(dist) {
+  var km = Math.min(dist, P.maxKm);
+  var rawHr = dist>0 ? dist/80 : 0;
+  var hr = Math.min(Math.round(rawHr*2)/2, P.maxHr);
+  var lines = [];
+  if (km>0) lines.push({l:'Kørsel '+km+' km (à '+P.kmRate+' kr.)', v:km*P.kmRate});
+  if (hr>0) lines.push({l:'Transport '+hr+' timer', v:hr*P.transHr});
+  return lines;
+}
+
+// ── Main calculation ────────────────────────────────────────────────────────
+function runCalc() {
+  ['err-address','err-type','err-svc','err-3d','err-hectares','err-windmills'].forEach(function(id){ el(id).classList.add('hidden'); });
+  el('address').style.borderColor='';
+
+  var hasP = selSvc.indexOf('photo')!==-1;
+  var hasD = selSvc.indexOf('drone')!==-1;
+  var has3 = selSvc.indexOf('3d')!==-1;
+  var hasPhoto = hasP || hasD;
+  var valid=true, firstErr=null;
+
+  function markErr(id,scrollEl) {
+    el(id).classList.remove('hidden');
+    if (valid) firstErr=scrollEl||el(id);
+    valid=false;
+  }
+  if (!el('address').value.trim()) { el('address').style.borderColor='#c0392b'; markErr('err-address',el('address')); }
+  if (!selType) markErr('err-type');
+  if ((selType==='solar'||selType==='combined') && !el('hectares').value) markErr('err-hectares');
+  if ((selType==='wind'||selType==='combined') && !el('windmills').value) markErr('err-windmills');
+  if ((selType==='wind'||selType==='combined') && el('windmills').value==='custom') { var wc=parseInt(el('windmills-custom').value||'0'); if(!wc||wc<21){show('windmills-custom-err'); if(valid) el('windmills-custom').focus(); valid=false;} }
+  if (selSvc.length===0) markErr('err-svc');
+  if (has3 && !hasPhoto) markErr('err-3d');
+  if (!valid) { if (firstErr) firstErr.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+
+  // Read standpunkter per service
+  var vpPhoto = hasP ? readVp('photo') : null;
+  var vpDrone = hasD ? readVp('drone') : null;
+  if (hasP && !vpPhoto) return;
+  if (hasD && !vpDrone) return;
+
+  // For 3D: use photo vp if available, else drone vp
+  var vp3d = hasP ? vpPhoto : vpDrone;
+
+  var dist = routeKm || 0;
+  var sections = [];
+  var totalEx = 0;
+  var travelAdded = false;  // travel/udlæg added once (shared cost)
+
+  function addSection(lines, heading) {
+    var sum=0;
+    for (var i=0;i<lines.length;i++) sum+=(lines[i].v||0);
+    sections.push({h:heading, lines:lines});
+    totalEx+=sum;
+  }
+
+  var travel = travelLines(dist);
+
+  // ── Build sections: ydelser first, then udlæg/transport at end ──────────
+  // Projectopstart is shared – added once
+  var sharedStartAdded = false;
+
+  if (hasP) {
+    var photoLines = [];
+    if (!sharedStartAdded) { photoLines.push({l:'Projektopstart', v:P.start}); sharedStartAdded=true; }
+    photoLines.push({l:'Terrænfotografi til visualisering × '+vpPhoto+' standpunkter à '+fmtDKK(P.vpRate), v:vpPhoto*P.vpRate});
+    addSection(photoLines, 'Terrænfotografi');
+  }
+
+  if (hasD) {
+    var droneLines = [];
+    if (!sharedStartAdded) { droneLines.push({l:'Projektopstart', v:P.start}); sharedStartAdded=true; }
+    droneLines.push({l:'Dronefotografi til visualisering × '+vpDrone+' standpunkter à '+fmtDKK(DR.vpRate), v:vpDrone*DR.vpRate});
+    addSection(droneLines, hasP ? 'Dronefotografi (tillæg)' : 'Dronefotografi');
+  }
+
+  if (has3) {
+    var ms = el('model-src').value;
+    var isBld = (selType==='building'||selType==='road');
+    var isSolar = (selType==='solar'||selType==='combined');
+    var pl = isBld ? 'none' : el('planting').value;
+    var hv = parseInt(el('hectares').value)||20;
+    var bc = D.bProv;
+    if (ms==='build') {
+      if (isBld)       bc=D.bBld;
+      else if (hv<=5)  bc=D.bSm;
+      else if (hv<=20) bc=D.bMd;
+      else if (hv<=50) bc=D.bLg;
+      else if (hv<=100)bc=D.bXl;
+      else             bc=D.bXxl;
+    }
+    var d3lines=[{l:'3D-opbygning ('+(ms==='build'?'inkl. modellering':'leveret model')+')', v:bc}];
+    if (isSolar) {
+      d3lines.push({l:'3D-visualisering: År 1 (nyetableret) × '+vp3d+' stk. à '+fmtDKK(D.yr1), v:vp3d*D.yr1});
+      if (pl==='yes') d3lines.push({l:'3D-visualisering: Fuldt udvokset beplantning × '+vp3d+' stk. à '+fmtDKK(D.yr10), v:vp3d*D.yr10});
+    } else if (pl==='yes') {
+      d3lines.push({l:'3D-visualisering: År 1 (nyetableret) à '+fmtDKK(D.yr1), v:D.yr1});
+      d3lines.push({l:'3D-visualisering: Fuldt udvokset beplantning × '+vp3d+' stk. à '+fmtDKK(D.yr10), v:vp3d*D.yr10});
+    } else {
+      d3lines.push({l:'3D-visualisering × '+vp3d+' standpunkter à '+fmtDKK(D.vis), v:vp3d*D.vis});
+    }
+    addSection(d3lines,'3D-visualisering');
+  }
+
+  // ── Udlæg og transport – altid til sidst ────────────────────────────────
+  if (travel.length > 0 || true) {
+    var udlaegLines = [];
+    udlaegLines.push({l:'Udlæg GPS', v:P.gps});
+    for (var tl=0;tl<travel.length;tl++) udlaegLines.push(travel[tl]);
+    addSection(udlaegLines,'Udlæg og transport');
+  }
+
+  // ── Island / abroad notes ────────────────────────────────────────────────
+  if (isAbroad) {
+    sections.push({h:'Tillæg – udland / Sverige', lines:[
+      {l:'Transport, overnatning og rejseudgifter', v:null, note:true},
+      {l:'Endelig pris oplyses i tilbuddet efter aftale', v:null, note:true}
+    ]});
+  } else if (isBornholm) {
+    sections.push({h:'Tillæg – Bornholm', lines:[
+      {l:'Færge eller fly + evt. overnatning', v:null, note:true},
+      {l:'Endelig pris oplyses i tilbuddet efter aftale', v:null, note:true}
+    ]});
+  } else if (isIsland) {
+    sections.push({h:'Tillæg', lines:[{l:'Færge / bro-udgifter – aftales særskilt', v:null, note:true}]});
+  }
+
+  var totalInc = totalEx*VAT;
+  // representative vp for teaser (average if both)
+  var vpRep = vpPhoto || vpDrone || 4;
+  calcR = {totalEx:totalEx, totalInc:totalInc, low:totalInc*0.91, high:totalInc*1.10, sections:sections, vpPhoto:vpPhoto, vpDrone:vpDrone, vp:vpRep, dist:dist};
+
+  var svcStr = selSvc.map(function(s){return s==='photo'?'terrænfotografi':s==='drone'?'dronefotografi':'3D-visualisering';}).join(' + ');
+  el('teaser-range').textContent = fmtDKK(calcR.low/VAT)+' – '+fmtDKK(calcR.high/VAT);
+  el('teaser-sub').textContent   = svcStr.charAt(0).toUpperCase()+svcStr.slice(1)+(dist?' · '+dist+' km fra Galten':'')+' · ekskl. moms';
+  el('blur-val').textContent     = fmtDKK(totalEx)+' kr. ekskl. moms';
+  var has3d = selSvc.indexOf('3d')!==-1;
+  el('teaser-unit-label').textContent = has3d ? 'Ca. stykpris pr. visualisering' : 'Ca. stykpris pr. foto';
+  el('teaser-unit-price').textContent = fmtDKK(Math.round(calcR.low/VAT/vpRep))+' – '+fmtDKK(Math.round(calcR.high/VAT/vpRep));
+
+  hide('step1'); show('step2');
+  el('step2').scrollIntoView({behavior:'smooth',block:'start'});
+  try { window.scrollTo({top:0,behavior:'smooth'}); } catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// EMAIL VERIFICATION FLOW
+// ══════════════════════════════════════════════════════════════════════════
+
+function sendLead() {
+  var firstname = el('c-firstname').value.trim();
+  var lastname  = el('c-lastname').value.trim();
+  var email     = el('c-email').value.trim();
+  var valid = true;
+  ['c-firstname','c-lastname','c-email'].forEach(function(id){ el(id).style.borderColor=''; });
+
+  if (!firstname) { el('c-firstname').style.borderColor='#c0392b'; if(valid) el('c-firstname').focus(); valid=false; }
+  if (!lastname)  { el('c-lastname').style.borderColor='#c0392b';  if(valid) el('c-lastname').focus();  valid=false; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    el('c-email').style.borderColor='#c0392b'; if(valid) el('c-email').focus(); valid=false;
+  }
+  if (!valid) return;
+
+  var btn = el('send-btn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Sender...';
+
+  // Generate OTP
+  otpCode = genOTP();
+  otpVerified = false;
+
+  var name = firstname+' '+lastname;
+  var r = calcR;
+
+  // Send ONLY the OTP code – estimate shown on screen after verification
+  emailjs.send(EJS_SERVICE, EJS_OTP_TEMPLATE, {
+    to_email:  email,
+    to_name:   name,
+    reply_to:  'info@mikkelbarker.dk',
+    subject:   'Din bekæftelseskode – Mikkel Barker prisberegner',
+    otp_code:  otpCode,
+    from_name: 'Mikkel Barker'
+  }).then(function(){
+    // Also send notification to Mikkel
+    var infoLines = [
+      'Ny forespørgsel via prisberegner','',
+      'KONTAKT',
+      'Navn: '+name,
+      'E-mail: '+email,
+      'Telefon: '+(el('c-phone').value.trim()||'Ikke angivet'),
+      '','PROJEKT',
+      'Type: '+selType,
+      'Ydelser: '+selSvc.join(', '),
+      'Hektar: '+(el('hectares').value||'–'),
+      'Vindmøller: '+(el('windmills').value==='custom' ? el('windmills-custom').value : el('windmills').value||'–'),
+      'Terrænfotografi standpunkter: '+(r.vpPhoto||'–'),
+      'Dronefotografi standpunkter: '+(r.vpDrone||'–'),
+      'Adresse: '+(el('address').value||'Ikke angivet'),
+      'Vejafstand: '+(r.dist?r.dist+' km':'Ikke beregnet'),
+      '','ESTIMAT',
+      'Ekskl. moms: '+Math.round(r.totalEx)+' kr.',
+      'Inkl. moms: '+Math.round(r.totalInc)+' kr.',
+      'Spænd ekskl. moms: '+Math.round(r.low/VAT)+'–'+Math.round(r.high/VAT)+' kr.',
+      '','BEMÆRKNINGER',
+      el('c-notes').value.trim()||'Ingen'
+    ];
+    emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
+      from_name: name, reply_to: email,
+      subject: 'Forespørgsel: '+selType+' – '+name,
+      message: infoLines.join('\n')
+    }).catch(function(){});
+
+    // Show OTP panel
+    hide('lead-form');
+    el('otp-email-display').textContent = email;
+    show('otp-panel');
+    setupOtpInputs();
+    btn.disabled=false;
+    btn.textContent='Send detaljeret prisestimat til min e-mail';
+  }).catch(function(err){
+    // Email failed (e.g. template not yet set up) – still show OTP panel
+    // but warn the user that email may not have arrived
+    hide('lead-form');
+    el('otp-email-display').textContent = email;
+    show('otp-panel');
+    setupOtpInputs();
+    btn.disabled=false;
+    btn.textContent='Send detaljeret prisestimat til min e-mail';
+    el('otp-err').textContent = 'Bemærk: Vi kunne ikke sende koden til din e-mail. Tjek at EJS_OTP_TEMPLATE er opsat korrekt i EmailJS.';
+    show('otp-err');
   });
 }
 
