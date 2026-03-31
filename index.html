@@ -626,7 +626,8 @@ function parseCSV(text) {
     var parts = lines[i].split(',');
     if (parts.length >= 2) {
       var key = parts[0].trim().replace(/"/g,'');
-      var val = parts.slice(1).join(',').trim().replace(/"/g,'');
+      // Take only column 2 (index 1) – ignore description in column 3
+      var val = parts[1].trim().replace(/"/g,'');
       if (key) map[key] = val;
     }
   }
@@ -641,7 +642,12 @@ function applyDesign(map) {
                 'fs-body','fs-small','fs-label','fs-btn','fs-card-h','fs-price','fs-range','fs-sec-lbl'];
   for (var i = 0; i < tokens.length; i++) {
     var t = tokens[i];
-    if (map[t]) root.style.setProperty('--' + t, map[t]);
+    var v = map[t];
+    // Only apply if value exists, is non-empty, and looks like a valid CSS value
+    // (starts with #, a letter, or a digit/dot – not a description text)
+    if (v && v.length > 0 && /^[#a-zA-Z0-9\.\-\(\)]/.test(v.trim())) {
+      root.style.setProperty('--' + t, v.trim());
+    }
   }
   // accent-l derived from accent (10% opacity version)
   if (map['accent']) {
@@ -1858,7 +1864,8 @@ function parseCSV(text) {
     var parts = lines[i].split(',');
     if (parts.length >= 2) {
       var key = parts[0].trim().replace(/"/g,'');
-      var val = parts.slice(1).join(',').trim().replace(/"/g,'');
+      // Take only column 2 (index 1) – ignore description in column 3
+      var val = parts[1].trim().replace(/"/g,'');
       if (key) map[key] = val;
     }
   }
@@ -1873,7 +1880,12 @@ function applyDesign(map) {
                 'fs-body','fs-small','fs-label','fs-btn','fs-card-h','fs-price','fs-range','fs-sec-lbl'];
   for (var i = 0; i < tokens.length; i++) {
     var t = tokens[i];
-    if (map[t]) root.style.setProperty('--' + t, map[t]);
+    var v = map[t];
+    // Only apply if value exists, is non-empty, and looks like a valid CSS value
+    // (starts with #, a letter, or a digit/dot – not a description text)
+    if (v && v.length > 0 && /^[#a-zA-Z0-9\.\-\(\)]/.test(v.trim())) {
+      root.style.setProperty('--' + t, v.trim());
+    }
   }
   // accent-l derived from accent (10% opacity version)
   if (map['accent']) {
