@@ -553,7 +553,18 @@ function applyDesign(map){
   var tokens=['accent','dark','paper','surface','radius','radius-lg','radius-btn','border-w','ink','ink2','ink3','white','fs-body','fs-small','fs-label','fs-btn','fs-card-h','fs-price','fs-range','fs-sec-lbl','fs-unit-price','fs-result-price','fs-result-unit','font-display','font-body','font-sec-lbl','font-card-h','font-card-sub','font-label','font-input','font-tog','font-hint','font-btn','font-range','font-unit-price','font-result-price','font-result-unit','font-small','fw-card-h','fw-card-sub','fw-label','fw-input','fw-tog','fw-hint','fw-btn','fw-small','fw-sec-lbl','fw-range','fw-unit-price','fw-result-price','fw-result-unit'];
   for(var i=0;i<tokens.length;i++){
     var t=tokens[i],v=map[t];
-    if(v&&/^[#a-zA-Z0-9]/.test(v.trim())){var cv=v.trim();if(t.indexOf('fs-')===0&&/^\d+(\.\d+)?$/.test(cv))cv+='px';root.style.setProperty('--'+t,cv);}
+    if(v&&/^[#a-zA-Z0-9]/.test(v.trim())){
+      var cv=v.trim();
+      if(t.indexOf('fs-')===0&&/^\d+(\.\d+)?$/.test(cv)) cv+='px';
+      if(t.indexOf('font-')===0){
+        // Replace known multi-word font names with quoted versions, then spaces become commas
+        cv=cv.replace(/TT Ramillas/g,'TTRAM').replace(/IBM Plex Sans/g,'IBMPS');
+        cv=cv.replace(/ /g,',');
+        cv=cv.replace(/TTRAM/g,'"TT Ramillas"').replace(/IBMPS/g,'"IBM Plex Sans"');
+        cv=cv.replace(/,,/g,',');
+      }
+      root.style.setProperty('--'+t,cv);
+    }
   }
   if(map['accent']){
     var hex=map['accent'].replace('#','');
