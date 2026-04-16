@@ -274,7 +274,7 @@ select{
 
   <div class="card">
     <h3>Om projektet</h3>
-    <p class="sub">Skriv adressen – vi henter vejkilometer fra Galten automatisk</p>
+    
 
     <div class="field">
       <label class="fl">Projektets adresse / by</label>
@@ -411,7 +411,7 @@ select{
   </div>
 
   <button class="btn" onclick="runCalc()">Beregn prisestimat</button>
-  <p class="small">Estimatet er vejledende og ikke bindende for nogen part.</p>
+  <p class="small">Estimatet er vejledende og ikke bindende for nogen part, og inkluderer ikke udgifter til færger, broer og overnatning til øer og udlandet.</p>
 </div>
 
 <!-- STEP 2 -->
@@ -503,7 +503,7 @@ var SHEET_PRICES_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdap0f1
 var SHEET_DESIGN_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdap0f1jHYDwqbzYtinZXL1g2m7xoSdmmTW4YFXTERbMOFzr8xrfr8q5cbUOwh5n-9QcAz3Ek7Csnx/pub?gid=262580509&single=true&output=csv';
 
 // ══ DEFAULT PRICES ══
-var P = { start:1275, vpRate:1725, gps:1350, transHr:675, kmRate:3.81, maxKm:300, maxHr:3 };
+var P = { start:1275, vpRate:1725, gps:1350, transHr:675, kmRate:3.81, maxKm:350, maxHr:3 };
 var DR = { vpRate:1725 };
 var D = { bSm:4500,bMd:5500,bLg:7000,bXl:8500,bXxl:10000,bBld:4000,bRoad:4000,bProv:1200,yr1:1875,yr10:785,vis:785 };
 
@@ -649,7 +649,7 @@ function initMaps(){
         routeKm=Math.round(res.rows[0].elements[0].distance.value/1000);
         setPill('ok',routeKm+' km');
         var rt=routeKm*2;
-        var extra=(routeKm>150&&!isIsland&&!isBornholm&&!isAbroad)?' · Max. 300 km faktureres (tur-retur).':'';        setNote('Vejafstand fra Galten: '+routeKm+' km (tur-retur: '+rt+' km) – km over 300 faktureres ikke'+extra);
+        var halfMax=Math.round(P.maxKm/2);var extra=(routeKm>halfMax&&!isIsland&&!isBornholm&&!isAbroad)?' · Max. '+P.maxKm+' km faktureres (tur-retur).':'';        setNote('Vejafstand fra Galten: '+routeKm+' km (tur-retur: '+rt+' km) – km over '+halfMax+' ('+P.maxKm+' t/r) faktureres ikke'+extra);
       } else {
         routeKm=null;setPill('err','?');
         if(isAbroad) setNote('Udenlandsk destination – transportpris aftales særskilt.');
@@ -760,7 +760,9 @@ function runCalc(){
     else d3l.push({l:'3D-visualisering × '+vp3d+' standpunkter à '+fmtDKK(D.vis),v:vp3d*D.vis});
     addSection(d3l,'3D-visualisering');
   }
-  var udl=[{l:'Udlæg GPS',v:P.gps}];for(var tl=0;tl<travel.length;tl++)udl.push(travel[tl]);addSection(udl,'Udlæg og transport');
+  var udl=[{l:'Udlæg GPS',v:P.gps}];for(var tl=0;tl<travel.length;tl++)udl.push(travel[tl]);
+  if(dist>P.maxKm) udl.push({l:'Kørsel: max. '+P.maxKm+' km faktureres ('+Math.round(P.maxKm/2)+' km tur-retur)',v:null,note:true});
+  addSection(udl,'Udlæg og transport');
   if(isAbroad) sections.push({h:'Tillæg – udland',lines:[{l:'Transport og overnatning aftales særskilt',v:null,note:true}]});
   else if(isBornholm) sections.push({h:'Tillæg – Bornholm',lines:[{l:'Færge/fly + evt. overnatning aftales særskilt',v:null,note:true}]});
   else if(isIsland) sections.push({h:'Tillæg',lines:[{l:'Færge/bro-udgifter aftales særskilt',v:null,note:true}]});
