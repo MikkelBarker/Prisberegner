@@ -630,6 +630,11 @@ function fmtDKK(n){return new Intl.NumberFormat('da-DK',{style:'currency',curren
 function initMaps(){
   var distSvc=new google.maps.DistanceMatrixService();
   var ac=new google.maps.places.Autocomplete(el('address'),{fields:['formatted_address','geometry','name','address_components'],types:['geocode','establishment']});
+  el('address').addEventListener('input',function(){
+    routeKm=null;
+    setPill('err','?');
+    setNote('');
+  });
   ac.addListener('place_changed',function(){
     var place=ac.getPlace();
     if(!place||!place.geometry){setPill('err','?');setNote('Adresse ikke fundet – prøv at vælge fra listen.');routeKm=null;return;}
@@ -744,11 +749,13 @@ function travelLines(dist){
 // ══ CALCULATE ══
 function runCalc(){
   ['err-address','err-type','err-svc','err-3d','err-hectares','err-windmills'].forEach(function(id){el(id).classList.add('hidden');});
+  el('err-address').textContent='Indtast venligst en adresse eller by';
   el('address').style.borderColor='';
   var hasP=selSvc.indexOf('photo')!==-1,hasD=selSvc.indexOf('drone')!==-1,has3=selSvc.indexOf('3d')!==-1,hasPhoto=hasP||hasD;
   var valid=true,firstErr=null;
   function markErr(id,scrollEl){el(id).classList.remove('hidden');if(valid)firstErr=scrollEl||el(id);valid=false;}
   if(!el('address').value.trim()){el('address').style.borderColor='#c0392b';markErr('err-address',el('address'));}
+  else if(routeKm===null){el('address').style.borderColor='#c0392b';markErr('err-address',el('address'));el('err-address').textContent='Vælg en adresse fra listen – afstanden skal beregnes';}
   if(!selType) markErr('err-type');
   if((selType==='solar'||selType==='combined')&&!el('hectares').value) markErr('err-hectares');
   if((selType==='wind'||selType==='combined')&&!el('windmills').value) markErr('err-windmills');
